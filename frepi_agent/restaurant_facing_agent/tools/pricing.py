@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from frepi_agent.config import get_config
-from frepi_agent.tools.supabase_client import (
+from .supabase_client import (
     get_supabase_client,
     Tables,
     fetch_many,

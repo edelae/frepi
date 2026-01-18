@@ -63,7 +63,7 @@ def tool_tracker():
 @pytest.fixture
 def mock_search_result(sample_products):
     """Create a mock search result from fixture data."""
-    from frepi_agent.tools.product_search import SearchResult, ProductMatch
+    from frepi_agent.restaurant_facing_agent.tools.product_search import SearchResult, ProductMatch
 
     products = sample_products[:2]  # Get first two products (picanhas)
     matches = [
@@ -89,7 +89,7 @@ def mock_search_result(sample_products):
 @pytest.fixture
 def mock_price_info(sample_prices):
     """Create mock price info from fixture data."""
-    from frepi_agent.tools.pricing import PriceInfo
+    from frepi_agent.restaurant_facing_agent.tools.pricing import PriceInfo
 
     prices_for_product_1 = [p for p in sample_prices if p["product_id"] == 1]
 
@@ -112,7 +112,7 @@ def mock_price_info(sample_prices):
 @pytest.fixture
 def mock_supplier(sample_suppliers):
     """Create a mock supplier from fixture data."""
-    from frepi_agent.tools.suppliers import Supplier
+    from frepi_agent.restaurant_facing_agent.tools.suppliers import Supplier
 
     s = sample_suppliers[0]
     return Supplier(

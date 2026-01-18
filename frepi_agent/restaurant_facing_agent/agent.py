@@ -11,15 +11,15 @@ from dataclasses import dataclass, field
 from openai import OpenAI
 
 from frepi_agent.config import get_config
-from frepi_agent.prompts.customer_agent import CUSTOMER_AGENT_PROMPT
-from frepi_agent.tools.product_search import search_products, SearchResult
-from frepi_agent.tools.pricing import (
+from .prompts.customer_agent import CUSTOMER_AGENT_PROMPT
+from .tools.product_search import search_products, SearchResult
+from .tools.pricing import (
     get_prices_for_product,
     validate_prices,
     get_best_price,
     PriceInfo,
 )
-from frepi_agent.tools.suppliers import (
+from .tools.suppliers import (
     get_supplier_by_name,
     search_suppliers,
     check_supplier_exists,

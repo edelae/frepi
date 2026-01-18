@@ -17,7 +17,7 @@ from telegram.ext import (
 )
 
 from frepi_agent.config import get_config
-from frepi_agent.agent import chat, ConversationContext
+from frepi_agent.restaurant_facing_agent.agent import chat, ConversationContext
 
 # Set up logging
 logging.basicConfig(

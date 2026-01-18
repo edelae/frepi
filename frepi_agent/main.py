@@ -11,7 +11,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from frepi_agent.config import get_config
-from frepi_agent.agent import chat, ConversationContext, get_agent
+from frepi_agent.restaurant_facing_agent.agent import chat, ConversationContext, get_agent
 
 
 console = Console()

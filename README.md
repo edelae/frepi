@@ -12,36 +12,52 @@ AI-powered restaurant purchasing assistant for Brazilian restaurants. Processes 
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      FREPI AGENT (GPT-4)                                │
+│              RESTAURANT FACING AGENT (Main Orchestrator - GPT-4)        │
 │                                                                         │
-│  • System prompt with Portuguese instructions                           │
-│  • 4-option menu navigation                                             │
-│  • Function calling for tool execution                                  │
+│  • Routes conversations to specialized subagents                        │
+│  • Maintains conversation context and state                             │
+│  • Handles 4-option menu navigation                                     │
 └────────────────────────────┬────────────────────────────────────────────┘
                              │
-          ┌──────────────────┼──────────────────┐
-          │                  │                  │
-          ▼                  ▼                  ▼
-   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-   │   Product   │   │   Pricing   │   │  Supplier   │
-   │   Search    │   │   Tools     │   │   Tools     │
-   │             │   │             │   │             │
-   │ • Vector    │   │ • Get       │   │ • Check     │
-   │   search    │   │   prices    │   │   exists    │
-   │ • Embedding │   │ • Validate  │   │ • Search    │
-   │   matching  │   │   freshness │   │ • Get by    │
-   │             │   │ • Best      │   │   product   │
-   │             │   │   price     │   │             │
-   └──────┬──────┘   └──────┬──────┘   └──────┬──────┘
-          │                 │                  │
-          └─────────────────┼──────────────────┘
-                            │
-                            ▼
+      ┌──────────────────────┼──────────────────────┐
+      │                      │                      │
+      ▼                      ▼                      ▼
+┌───────────────┐   ┌─────────────────┐   ┌──────────────────┐
+│  ONBOARDING   │   │ SUPPLIER PRICE  │   │ PURCHASE ORDER   │
+│   SUBAGENT    │   │    UPDATER      │   │    SUBAGENTS     │
+│               │   │                 │   │                  │
+│ • New user    │   │ • Verify        │   │ • ORDER CREATOR  │
+│   registration│   │   supplier      │   │   - Product      │
+│ • Invoice     │   │ • Collect       │   │     search       │
+│   parsing     │   │   prices        │   │   - Price        │
+│ • Preference  │   │ • Update        │   │     comparison   │
+│   collection  │   │   history       │   │   - Order        │
+│               │   │                 │   │     creation     │
+│ Tools:        │   │ Tools:          │   │                  │
+│ • image_parser│   │ • check_supplier│   │ • ORDER FOLLOWUP │
+│ • product_pref│   │ • update_price  │   │   - Status track │
+│ • supplier_reg│   │                 │   │   - History      │
+└───────────────┘   └─────────────────┘   └──────────────────┘
+      │                      │                      │
+      └──────────────────────┼──────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     SHARED TOOLS (Database Layer)                       │
+│                                                                         │
+│  • product_search (vector similarity with embeddings)                   │
+│  • pricing (price queries, validation, best price)                      │
+│  • suppliers (supplier operations and lookups)                          │
+│  • embeddings (OpenAI text-embedding-3-small)                           │
+└────────────────────────────┬────────────────────────────────────────────┘
+                             │
+                             ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    SUPABASE (PostgreSQL + pgvector)                     │
 │                                                                         │
 │  Tables: master_list, supplier_mapped_products, pricing_history,        │
-│          suppliers, restaurants, restaurant_product_preferences         │
+│          suppliers, restaurants, restaurant_product_preferences,        │
+│          telegram_users, restaurant_people                              │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -63,42 +79,206 @@ AI-powered restaurant purchasing assistant for Brazilian restaurants. Processes 
 frepi-agent/
 ├── frepi_agent/
 │   ├── __init__.py
-│   ├── main.py                    # CLI entry point
-│   ├── agent.py                   # GPT-4 agent with function calling
-│   ├── config.py                  # Environment configuration
-│   ├── prompts/
-│   │   └── customer_agent.py      # Portuguese system prompt
-│   ├── tools/
-│   │   ├── supabase_client.py     # Database connection
-│   │   ├── embeddings.py          # OpenAI embeddings
-│   │   ├── product_search.py      # Vector similarity search
-│   │   ├── pricing.py             # Price queries & validation
-│   │   └── suppliers.py           # Supplier operations
+│   ├── main.py                        # CLI entry point
+│   ├── config.py                      # Environment configuration
+│   │
+│   ├── restaurant_facing_agent/       # Main customer-facing agent
+│   │   ├── __init__.py
+│   │   ├── agent.py                   # GPT-4 agent with function calling
+│   │   ├── prompts/
+│   │   │   └── customer_agent.py      # Portuguese system prompt
+│   │   │
+│   │   ├── subagents/                 # Specialized sub-agents
+│   │   │   ├── onboarding_subagent/   # New user registration
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── agent.py
+│   │   │   │   └── tools/
+│   │   │   │       ├── image_parser.py        # GPT-4 Vision invoice parsing
+│   │   │   │       ├── product_preference.py  # Preference collection
+│   │   │   │       └── supplier_registration.py
+│   │   │   │
+│   │   │   ├── supplier_price_updater/    # Price update flow
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── agent.py
+│   │   │   │
+│   │   │   ├── purchase_order_creator/    # Order creation flow
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── agent.py
+│   │   │   │
+│   │   │   └── purchase_order_followup/   # Order tracking
+│   │   │       ├── __init__.py
+│   │   │       └── agent.py
+│   │   │
+│   │   └── tools/                     # Shared tools for main agent
+│   │       ├── supabase_client.py     # Database connection
+│   │       ├── embeddings.py          # OpenAI embeddings
+│   │       ├── product_search.py      # Vector similarity search
+│   │       ├── pricing.py             # Price queries & validation
+│   │       └── suppliers.py           # Supplier operations
+│   │
 │   └── integrations/
-│       └── telegram_bot.py        # Telegram bot handler
+│       └── telegram_bot.py            # Telegram bot handler
+│
+├── docs/
+│   └── UX_GUIDE.md                    # User experience documentation
 │
 ├── tests/
-│   ├── test_matrix.yaml           # 13 test cases (YAML)
-│   ├── test_agent.py              # Parametrized test runner
-│   ├── conftest.py                # Fixtures and mocks
+│   ├── test_matrix.yaml               # Test cases (YAML)
+│   ├── test_agent.py                  # Parametrized test runner
+│   ├── conftest.py                    # Fixtures and mocks
 │   ├── helpers/
-│   │   ├── test_loader.py         # YAML parser
-│   │   ├── assertions.py          # Custom assertions
-│   │   └── report_generator.py    # HTML/JSON reports
+│   │   ├── test_loader.py             # YAML parser
+│   │   ├── assertions.py              # Custom assertions
+│   │   └── report_generator.py        # HTML/JSON reports
 │   └── fixtures/
 │       ├── sample_products.json
 │       ├── sample_suppliers.json
 │       └── sample_prices.json
 │
 ├── deploy/
-│   ├── setup.sh                   # GCP VM setup script
-│   ├── frepi-agent.service        # systemd service file
-│   └── GCP_DEPLOYMENT.md          # Deployment guide
+│   ├── setup.sh                       # GCP VM setup script
+│   ├── frepi-agent.service            # systemd service file
+│   └── GCP_DEPLOYMENT.md              # Deployment guide
 │
 ├── pyproject.toml
 ├── requirements.txt
-└── .env                           # Environment variables (not committed)
+└── .env                               # Environment variables (not committed)
 ```
+
+### Agent Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    TELEGRAM BOT (Entry Point)                    │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              RESTAURANT FACING AGENT (Main Orchestrator)         │
+│                                                                  │
+│  • Routes conversations to appropriate subagent                  │
+│  • Maintains conversation context                                │
+│  • Handles 4-option menu navigation                              │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+         ┌───────────────────┼───────────────────┐
+         │                   │                   │
+         ▼                   ▼                   ▼
+┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│   ONBOARDING    │ │  PRICE UPDATER  │ │ PURCHASE ORDER  │
+│    SUBAGENT     │ │    SUBAGENT     │ │    SUBAGENT     │
+│                 │ │                 │ │                 │
+│ • New user reg  │ │ • Supplier      │ │ • Order creation│
+│ • Invoice parse │ │   price updates │ │ • Order followup│
+│ • Preferences   │ │ • Price history │ │ • Status track  │
+└────────┬────────┘ └────────┬────────┘ └────────┬────────┘
+         │                   │                   │
+         └───────────────────┼───────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 SHARED TOOLS (Database Layer)                    │
+│                                                                  │
+│  • product_search (vector similarity)                            │
+│  • pricing (price queries & validation)                          │
+│  • suppliers (supplier operations)                               │
+│  • embeddings (OpenAI text-embedding-3-small)                    │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 SUPABASE (PostgreSQL + pgvector)                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Subagent System
+
+The main Restaurant Facing Agent orchestrates **4 specialized subagents**, each responsible for a specific domain of functionality.
+
+### Menu → Subagent Mapping
+
+| Menu Option | Subagent | Trigger |
+|-------------|----------|---------|
+| (New user detected) | Onboarding Subagent | Automatic |
+| 1️⃣ Fazer uma compra | Purchase Order Creator | User selection |
+| 2️⃣ Atualizar preços | Supplier Price Updater | User selection |
+| 3️⃣ Registrar fornecedor | Onboarding Subagent | User selection |
+| 4️⃣ Configurar preferências | Onboarding Subagent | User selection |
+| (After order created) | Purchase Order Followup | Automatic |
+
+### 1. Onboarding Subagent
+
+**Location**: `frepi_agent/restaurant_facing_agent/subagents/onboarding_subagent/`
+
+**Trigger**: New user detected (`telegram_chat_id` not in database) OR menu options 3️⃣, 4️⃣
+
+**Responsibilities**:
+- User registration (restaurant or supplier)
+- Invoice photo parsing with GPT-4 Vision
+- Product preference collection (top 10 products)
+- Supplier auto-registration from invoices
+
+**Tools**:
+| Tool | File | Purpose |
+|------|------|---------|
+| `image_parser` | `tools/image_parser.py` | GPT-4 Vision invoice parsing |
+| `product_preference` | `tools/product_preference.py` | Preference collection & storage |
+| `supplier_registration` | `tools/supplier_registration.py` | New supplier creation |
+
+### 2. Supplier Price Updater Subagent
+
+**Location**: `frepi_agent/restaurant_facing_agent/subagents/supplier_price_updater/`
+
+**Trigger**: Menu option 2️⃣ or user mentions price update
+
+**Responsibilities**:
+- Verify supplier exists in system
+- Collect price updates from user/supplier
+- Validate and store in `pricing_history`
+- Track price freshness
+
+**Tools**:
+| Tool | Purpose |
+|------|---------|
+| `check_supplier` | Verify supplier exists |
+| `update_price` | Insert/update pricing_history |
+
+### 3. Purchase Order Creator Subagent
+
+**Location**: `frepi_agent/restaurant_facing_agent/subagents/purchase_order_creator/`
+
+**Trigger**: Menu option 1️⃣ or user wants to buy
+
+**Responsibilities**:
+- Product search and semantic matching
+- Price comparison across suppliers
+- Order creation and confirmation
+- Price validation before order acceptance
+
+**Tools** (uses shared tools):
+| Tool | Purpose |
+|------|---------|
+| `search_products` | Vector similarity search |
+| `get_product_prices` | Get prices by supplier |
+| `validate_product_prices` | Check price freshness |
+| `get_suppliers_for_product` | List available suppliers |
+
+### 4. Purchase Order Followup Subagent
+
+**Location**: `frepi_agent/restaurant_facing_agent/subagents/purchase_order_followup/`
+
+**Trigger**: After order creation or user asks about order status
+
+**Responsibilities**:
+- Order status tracking
+- Delivery updates
+- Order history retrieval
+
+**Tools**:
+| Tool | Purpose |
+|------|---------|
+| `get_order_status` | Current order status |
+| `get_order_history` | Past orders list |
 
 ## Quick Start
 
@@ -254,7 +434,7 @@ sudo systemctl restart frepi-agent
 
 | Table | Purpose |
 |-------|---------|
-| `master_list` | Product catalog with embeddings |
+| `master_list` | Restaurant's product list with embeddings, preferences, and specifications |
 | `supplier_mapped_products` | SKU mappings to master list |
 | `pricing_history` | Historical prices with validity |
 | `suppliers` | Supplier profiles and metrics |
