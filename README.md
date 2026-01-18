@@ -2,62 +2,63 @@
 
 AI-powered restaurant purchasing assistant for Brazilian restaurants. Processes natural language requests via Telegram to help restaurants compare prices, manage suppliers, and optimize purchasing decisions.
 
+**Key Innovation**: A single Telegram number serves BOTH restaurants AND suppliers, with intelligent routing based on user identification.
+
 ## Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         TELEGRAM BOT                                     │
 │                    (python-telegram-bot)                                 │
+│                                                                         │
+│         Single number serves BOTH restaurants AND suppliers             │
 └────────────────────────────┬────────────────────────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│              RESTAURANT FACING AGENT (Main Orchestrator - GPT-4)        │
+│                      MESSAGE ROUTER                                      │
+│                 (shared/user_identification.py)                         │
 │                                                                         │
-│  • Routes conversations to specialized subagents                        │
-│  • Maintains conversation context and state                             │
-│  • Handles 4-option menu navigation                                     │
-└────────────────────────────┬────────────────────────────────────────────┘
-                             │
-      ┌──────────────────────┼──────────────────────┐
-      │                      │                      │
-      ▼                      ▼                      ▼
-┌───────────────┐   ┌─────────────────┐   ┌──────────────────┐
-│  ONBOARDING   │   │ SUPPLIER PRICE  │   │ PURCHASE ORDER   │
-│   SUBAGENT    │   │    UPDATER      │   │    SUBAGENTS     │
-│               │   │                 │   │                  │
-│ • New user    │   │ • Verify        │   │ • ORDER CREATOR  │
-│   registration│   │   supplier      │   │   - Product      │
-│ • Invoice     │   │ • Collect       │   │     search       │
-│   parsing     │   │   prices        │   │   - Price        │
-│ • Preference  │   │ • Update        │   │     comparison   │
-│   collection  │   │   history       │   │   - Order        │
-│               │   │                 │   │     creation     │
-│ Tools:        │   │ Tools:          │   │                  │
-│ • image_parser│   │ • check_supplier│   │ • ORDER FOLLOWUP │
-│ • product_pref│   │ • update_price  │   │   - Status track │
-│ • supplier_reg│   │                 │   │   - History      │
-└───────────────┘   └─────────────────┘   └──────────────────┘
-      │                      │                      │
-      └──────────────────────┼──────────────────────┘
-                             │
-                             ▼
+│  1. Check restaurant_people by telegram_chat_id → Restaurant Agent      │
+│  2. Check suppliers by telegram_chat_id → Supplier Agent                │
+│  3. Unknown → Ask: "Are you a restaurant (1) or supplier (2)?"          │
+└──────────┬─────────────────────────────────────────┬────────────────────┘
+           │                                         │
+           ▼                                         ▼
+┌──────────────────────────────┐     ┌──────────────────────────────┐
+│  RESTAURANT FACING AGENT     │     │   SUPPLIER FACING AGENT      │
+│                              │     │                              │
+│  4 Menu Options:             │     │  4 Menu Options:             │
+│  1️⃣ Fazer uma compra         │     │  1️⃣ Ver cotações pendentes   │
+│  2️⃣ Atualizar preços         │     │  2️⃣ Enviar cotação           │
+│  3️⃣ Registrar fornecedor     │     │  3️⃣ Confirmar pedido         │
+│  4️⃣ Configurar preferências  │     │  4️⃣ Atualizar entrega        │
+│                              │     │                              │
+│  Subagents:                  │     │  Subagents:                  │
+│  • Onboarding                │     │  • Supplier Onboarding       │
+│  • Price Updater             │     │  • Quotation                 │
+│  • Order Creator             │     │  • Order Confirmation        │
+│  • Order Followup            │     │  • Delivery Update           │
+└──────────────┬───────────────┘     └──────────────┬───────────────┘
+               │                                    │
+               └────────────────┬───────────────────┘
+                                │
+                                ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                     SHARED TOOLS (Database Layer)                       │
+│                     SHARED INFRASTRUCTURE                                │
+│                     (frepi_agent/shared/)                               │
 │                                                                         │
-│  • product_search (vector similarity with embeddings)                   │
-│  • pricing (price queries, validation, best price)                      │
-│  • suppliers (supplier operations and lookups)                          │
-│  • embeddings (OpenAI text-embedding-3-small)                           │
-└────────────────────────────┬────────────────────────────────────────────┘
-                             │
-                             ▼
+│  • supabase_client.py - Database connection (single source of truth)    │
+│  • user_identification.py - User type detection and routing             │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │
+                                 ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    SUPABASE (PostgreSQL + pgvector)                     │
 │                                                                         │
 │  Tables: master_list, supplier_mapped_products, pricing_history,        │
 │          suppliers, restaurants, restaurant_product_preferences,        │
-│          telegram_users, restaurant_people                              │
+│          purchase_orders, restaurant_people                             │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -82,7 +83,12 @@ frepi-agent/
 │   ├── main.py                        # CLI entry point
 │   ├── config.py                      # Environment configuration
 │   │
-│   ├── restaurant_facing_agent/       # Main customer-facing agent
+│   ├── shared/                        # Shared utilities for all agents
+│   │   ├── __init__.py
+│   │   ├── supabase_client.py         # Database connection (single source)
+│   │   └── user_identification.py     # User type detection & routing
+│   │
+│   ├── restaurant_facing_agent/       # Customer-facing agent
 │   │   ├── __init__.py
 │   │   ├── agent.py                   # GPT-4 agent with function calling
 │   │   ├── prompts/
@@ -90,7 +96,6 @@ frepi-agent/
 │   │   │
 │   │   ├── subagents/                 # Specialized sub-agents
 │   │   │   ├── onboarding_subagent/   # New user registration
-│   │   │   │   ├── __init__.py
 │   │   │   │   ├── agent.py
 │   │   │   │   └── tools/
 │   │   │   │       ├── image_parser.py        # GPT-4 Vision invoice parsing
@@ -98,26 +103,36 @@ frepi-agent/
 │   │   │   │       └── supplier_registration.py
 │   │   │   │
 │   │   │   ├── supplier_price_updater/    # Price update flow
-│   │   │   │   ├── __init__.py
-│   │   │   │   └── agent.py
-│   │   │   │
 │   │   │   ├── purchase_order_creator/    # Order creation flow
-│   │   │   │   ├── __init__.py
-│   │   │   │   └── agent.py
-│   │   │   │
 │   │   │   └── purchase_order_followup/   # Order tracking
-│   │   │       ├── __init__.py
-│   │   │       └── agent.py
 │   │   │
-│   │   └── tools/                     # Shared tools for main agent
-│   │       ├── supabase_client.py     # Database connection
+│   │   └── tools/                     # Restaurant agent tools
+│   │       ├── supabase_client.py     # Re-exports from shared/
 │   │       ├── embeddings.py          # OpenAI embeddings
 │   │       ├── product_search.py      # Vector similarity search
 │   │       ├── pricing.py             # Price queries & validation
 │   │       └── suppliers.py           # Supplier operations
 │   │
+│   ├── supplier_facing_agent/         # Supplier-facing agent (NEW)
+│   │   ├── __init__.py
+│   │   ├── agent.py                   # GPT-4 agent with function calling
+│   │   ├── prompts/
+│   │   │   └── supplier_agent.py      # Portuguese system prompt
+│   │   │
+│   │   ├── subagents/                 # Specialized sub-agents
+│   │   │   ├── supplier_onboarding/   # New supplier registration
+│   │   │   ├── quotation_subagent/    # Quotation handling
+│   │   │   ├── order_confirmation/    # Order confirmation
+│   │   │   └── delivery_update/       # Delivery tracking
+│   │   │
+│   │   └── tools/                     # Supplier agent tools
+│   │       ├── quotation_request.py   # Pending quotations
+│   │       ├── price_submission.py    # Submit prices
+│   │       ├── order_management.py    # Confirm/reject orders
+│   │       └── delivery_status.py     # Update deliveries
+│   │
 │   └── integrations/
-│       └── telegram_bot.py            # Telegram bot handler
+│       └── telegram_bot.py            # Telegram bot with routing logic
 │
 ├── docs/
 │   └── UX_GUIDE.md                    # User experience documentation
@@ -279,6 +294,110 @@ The main Restaurant Facing Agent orchestrates **4 specialized subagents**, each 
 |------|---------|
 | `get_order_status` | Current order status |
 | `get_order_history` | Past orders list |
+
+---
+
+## Supplier Facing Agent
+
+The Supplier Facing Agent handles all interactions with suppliers who contact the same Telegram number. It enables suppliers to respond to quotation requests, confirm orders, and update delivery statuses.
+
+### Supplier Menu → Subagent Mapping
+
+| Menu Option | Subagent | Trigger |
+|-------------|----------|---------|
+| (New supplier detected) | Supplier Onboarding | Automatic |
+| 1️⃣ Ver cotações pendentes | Quotation Subagent | User selection |
+| 2️⃣ Enviar cotação | Quotation Subagent | User selection |
+| 3️⃣ Confirmar pedido | Order Confirmation | User selection |
+| 4️⃣ Atualizar entrega | Delivery Update | User selection |
+
+### 1. Supplier Onboarding Subagent
+
+**Location**: `frepi_agent/supplier_facing_agent/subagents/supplier_onboarding/`
+
+**Trigger**: New supplier detected (`telegram_chat_id` not in `suppliers` table)
+
+**Responsibilities**:
+- Collect company information (name, CNPJ, contact)
+- Register new supplier in database
+- Link to existing restaurant relationships
+
+**Tools**:
+| Tool | Purpose |
+|------|---------|
+| `check_supplier_exists` | Verify if supplier already registered |
+| `register_supplier` | Create new supplier record |
+
+### 2. Quotation Subagent
+
+**Location**: `frepi_agent/supplier_facing_agent/subagents/quotation_subagent/`
+
+**Trigger**: Menu options 1️⃣ or 2️⃣, or supplier mentions prices
+
+**Responsibilities**:
+- Show pending quotation requests from restaurants
+- Accept price submissions for products
+- Validate and store prices in `pricing_history`
+
+**Tools**:
+| Tool | File | Purpose |
+|------|------|---------|
+| `get_pending_quotations` | `tools/quotation_request.py` | List products awaiting price |
+| `submit_price` | `tools/price_submission.py` | Record a price quotation |
+| `search_product_to_quote` | `tools/price_submission.py` | Find product to submit price |
+
+### 3. Order Confirmation Subagent
+
+**Location**: `frepi_agent/supplier_facing_agent/subagents/order_confirmation/`
+
+**Trigger**: Menu option 3️⃣ or supplier mentions order
+
+**Responsibilities**:
+- Show pending orders awaiting supplier confirmation
+- Accept/reject orders with delivery estimates
+- Update order status in database
+
+**Tools**:
+| Tool | File | Purpose |
+|------|------|---------|
+| `get_pending_orders` | `tools/order_management.py` | List orders awaiting confirmation |
+| `confirm_order` | `tools/order_management.py` | Accept order with delivery date |
+| `reject_order` | `tools/order_management.py` | Decline order with reason |
+
+### 4. Delivery Update Subagent
+
+**Location**: `frepi_agent/supplier_facing_agent/subagents/delivery_update/`
+
+**Trigger**: Menu option 4️⃣ or supplier mentions delivery
+
+**Responsibilities**:
+- Track active deliveries in progress
+- Update delivery status (preparing, in transit, delivered)
+- Report delivery issues or delays
+
+**Tools**:
+| Tool | File | Purpose |
+|------|------|---------|
+| `get_active_deliveries` | `tools/delivery_status.py` | List deliveries in progress |
+| `update_delivery_status` | `tools/delivery_status.py` | Update status (preparing/in_transit/delivered/delayed) |
+| `report_delivery_issue` | `tools/delivery_status.py` | Log problems with delivery |
+
+### Supplier Agent Tools Summary
+
+| Tool | Module | Description |
+|------|--------|-------------|
+| `get_pending_quotations` | quotation_request | Get products awaiting pricing from this supplier |
+| `get_quotation_details` | quotation_request | Get details of a specific quotation request |
+| `submit_price` | price_submission | Submit a price for a product |
+| `search_product_to_quote` | price_submission | Search for product to quote by name |
+| `get_pending_orders` | order_management | List orders awaiting supplier confirmation |
+| `confirm_order` | order_management | Confirm order with delivery estimate |
+| `reject_order` | order_management | Reject order with reason |
+| `get_active_deliveries` | delivery_status | List deliveries in progress |
+| `update_delivery_status` | delivery_status | Update delivery status |
+| `report_delivery_issue` | delivery_status | Report delivery problem |
+
+---
 
 ## Quick Start
 
