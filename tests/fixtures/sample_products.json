@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1,
+    "product_name": "Picanha Friboi Premium",
+    "brand": "Friboi",
+    "specifications": {"weight": "kg", "type": "carne bovina", "cut": "picanha"},
+    "product_tags": ["carne", "bovina", "picanha", "premium"],
+    "is_active": true,
+    "is_verified": true,
+    "quality_tier": "premium"
+  },
+  {
+    "id": 2,
+    "product_name": "Picanha Marfrig",
+    "brand": "Marfrig",
+    "specifications": {"weight": "kg", "type": "carne bovina", "cut": "picanha"},
+    "product_tags": ["carne", "bovina", "picanha"],
+    "is_active": true,
+    "is_verified": true,
+    "quality_tier": "standard"
+  },
+  {
+    "id": 3,
+    "product_name": "Arroz Camil Tipo 1 5kg",
+    "brand": "Camil",
+    "specifications": {"weight": "5kg", "type": "arroz branco", "grain": "longo"},
+    "product_tags": ["arroz", "grãos", "camil"],
+    "is_active": true,
+    "is_verified": true,
+    "quality_tier": "standard"
+  },
+  {
+    "id": 4,
+    "product_name": "Arroz Tio João Tipo 1 5kg",
+    "brand": "Tio João",
+    "specifications": {"weight": "5kg", "type": "arroz branco", "grain": "longo"},
+    "product_tags": ["arroz", "grãos", "tio joão"],
+    "is_active": true,
+    "is_verified": true,
+    "quality_tier": "premium"
+  },
+  {
+    "id": 5,
+    "product_name": "Óleo de Soja Soya 900ml",
+    "brand": "Soya",
+    "specifications": {"volume": "900ml", "type": "óleo vegetal"},
+    "product_tags": ["óleo", "soja", "cozinha"],
+    "is_active": true,
+    "is_verified": true,
+    "quality_tier": "standard"
+  },
+  {
+    "id": 6,
+    "product_name": "Feijão Carioca Camil 1kg",
+    "brand": "Camil",
+    "specifications": {"weight": "1kg", "type": "feijão carioca"},
+    "product_tags": ["feijão", "carioca", "grãos"],
+    "is_active": true,
+    "is_verified": true,
+    "quality_tier": "standard"
+  },
+  {
+    "id": 7,
+    "product_name": "Filé Mignon Friboi",
+    "brand": "Friboi",
+    "specifications": {"weight": "kg", "type": "carne bovina", "cut": "filé mignon"},
+    "product_tags": ["carne", "bovina", "filé", "premium"],
+    "is_active": true,
+    "is_verified": true,
+    "quality_tier": "premium"
+  },
+  {
+    "id": 8,
+    "product_name": "Frango Inteiro Sadia",
+    "brand": "Sadia",
+    "specifications": {"weight": "kg", "type": "ave"},
+    "product_tags": ["frango", "ave", "sadia"],
+    "is_active": true,
+    "is_verified": true,
+    "quality_tier": "standard"
+  }
+]

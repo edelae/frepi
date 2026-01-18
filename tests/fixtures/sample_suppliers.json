@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "company_name": "Frigorífico Central",
+    "contact_person": "João Silva",
+    "phone": "11999887766",
+    "email": "contato@frigorifico-central.com.br",
+    "cnpj": "12.345.678/0001-90",
+    "address": "Rua das Carnes, 100 - São Paulo, SP",
+    "is_active": true,
+    "reliability_score": 0.95,
+    "response_time_avg": 2.5,
+    "fulfillment_rate": 0.98,
+    "total_orders": 150
+  },
+  {
+    "id": 2,
+    "company_name": "Marfrig Distribuidora",
+    "contact_person": "Maria Santos",
+    "phone": "11988776655",
+    "email": "vendas@marfrig-dist.com.br",
+    "cnpj": "98.765.432/0001-10",
+    "address": "Av. Industrial, 500 - Guarulhos, SP",
+    "is_active": true,
+    "reliability_score": 0.92,
+    "response_time_avg": 3.0,
+    "fulfillment_rate": 0.95,
+    "total_orders": 200
+  },
+  {
+    "id": 3,
+    "company_name": "Distribuidor Grãos SP",
+    "contact_person": "Carlos Oliveira",
+    "phone": "11977665544",
+    "email": "vendas@graossp.com.br",
+    "cnpj": "45.678.901/0001-23",
+    "address": "Rua dos Grãos, 200 - São Paulo, SP",
+    "is_active": true,
+    "reliability_score": 0.90,
+    "response_time_avg": 4.0,
+    "fulfillment_rate": 0.92,
+    "total_orders": 80
+  },
+  {
+    "id": 4,
+    "company_name": "Atacadão Alimentos",
+    "contact_person": "Ana Costa",
+    "phone": "11966554433",
+    "email": "compras@atacadao-alimentos.com.br",
+    "cnpj": "67.890.123/0001-45",
+    "address": "Rod. Raposo Tavares, km 25 - Cotia, SP",
+    "is_active": true,
+    "reliability_score": 0.88,
+    "response_time_avg": 5.0,
+    "fulfillment_rate": 0.90,
+    "total_orders": 60
+  },
+  {
+    "id": 5,
+    "company_name": "Friboi Direto",
+    "contact_person": "Roberto Lima",
+    "phone": "11955443322",
+    "email": "vendas@friboi-direto.com.br",
+    "cnpj": "23.456.789/0001-67",
+    "address": "Av. das Nações, 1000 - Barueri, SP",
+    "is_active": true,
+    "reliability_score": 0.97,
+    "response_time_avg": 1.5,
+    "fulfillment_rate": 0.99,
+    "total_orders": 300
+  }
+]

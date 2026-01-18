@@ -1,0 +1,352 @@
+# Frepi Agent Test Matrix
+# This file defines all test cases for automated testing of the Frepi bot
+# Add new test cases as needed - the test runner will automatically pick them up
+
+version: "1.0"
+metadata:
+  description: "Frepi Agent Bot Test Matrix"
+  created: "2026-01-15"
+  language: "pt-BR"
+
+settings:
+  default_timeout_seconds: 30
+  default_restaurant_id: 1
+  require_portuguese: true
+  require_emojis: true
+
+groups:
+  - id: "A"
+    name: "Onboarding"
+    description: "First-time user flows and initial setup"
+  - id: "B"
+    name: "Pre-Purchase"
+    description: "Price checks and purchase preparation"
+  - id: "C"
+    name: "Core Purchasing"
+    description: "Main purchasing workflows"
+  - id: "D"
+    name: "Post-Purchase"
+    description: "Order tracking and history"
+  - id: "E"
+    name: "Management"
+    description: "Configuration and supplier management"
+  - id: "F"
+    name: "Error Handling"
+    description: "Edge cases and error scenarios"
+
+test_cases:
+  # ============================================
+  # GROUP A - ONBOARDING
+  # ============================================
+
+  - id: "A001"
+    name: "First-time user greeting"
+    group: "A"
+    description: "New user sends greeting, should receive welcome and 4-option menu"
+    priority: "high"
+    tags: ["greeting", "menu", "onboarding"]
+    conversation:
+      - turn: 1
+        user_message: "Oi"
+        expected:
+          contains_any:
+            - "Olá"
+            - "Bem-vindo"
+            - "bem-vindo"
+            - "Oi"
+          contains_all:
+            - "1️⃣"
+            - "2️⃣"
+            - "3️⃣"
+            - "4️⃣"
+          contains_menu: true
+          language: "pt-BR"
+          has_emojis: true
+        tool_calls_expected: []
+        tool_calls_forbidden: []
+
+  - id: "A002"
+    name: "Supplier price update request"
+    group: "A"
+    description: "User wants to update supplier prices"
+    priority: "high"
+    tags: ["price-update", "supplier"]
+    conversation:
+      - turn: 1
+        user_message: "Quero atualizar preços do fornecedor Marfrig"
+        expected:
+          contains_any:
+            - "Marfrig"
+            - "preços"
+            - "fornecedor"
+            - "atualizar"
+          language: "pt-BR"
+        tool_calls_expected:
+          - name: "check_supplier"
+            args_contain:
+              supplier_name: "Marfrig"
+
+  # ============================================
+  # GROUP B - PRE-PURCHASE
+  # ============================================
+
+  - id: "B001"
+    name: "Price check without purchasing"
+    group: "B"
+    description: "User asks for price without intent to buy"
+    priority: "high"
+    tags: ["price-check", "info"]
+    conversation:
+      - turn: 1
+        user_message: "Quanto custa a picanha?"
+        expected:
+          contains_any:
+            - "R$"
+            - "preço"
+            - "Picanha"
+            - "picanha"
+          has_price_format: true
+          language: "pt-BR"
+        tool_calls_expected:
+          - name: "search_products"
+            args_contain:
+              query: "picanha"
+
+  - id: "B002"
+    name: "Complete purchase flow"
+    group: "B"
+    description: "User makes a purchase request with quantity"
+    priority: "critical"
+    tags: ["purchase", "multi-turn"]
+    conversation:
+      - turn: 1
+        user_message: "Preciso de 10kg de picanha"
+        expected:
+          contains_any:
+            - "Picanha"
+            - "picanha"
+            - "10kg"
+            - "10 kg"
+          contains_all:
+            - "R$"
+          has_price_format: true
+          has_supplier_names: true
+          language: "pt-BR"
+        tool_calls_expected:
+          - name: "search_products"
+      - turn: 2
+        user_message: "Confirmo o pedido"
+        expected:
+          contains_any:
+            - "confirmado"
+            - "pedido"
+            - "✅"
+            - "recebido"
+          language: "pt-BR"
+
+  # ============================================
+  # GROUP C - CORE PURCHASING
+  # ============================================
+
+  - id: "C001"
+    name: "Product not in master list (LOW confidence)"
+    group: "C"
+    description: "User requests product that returns LOW confidence match"
+    priority: "high"
+    tags: ["low-confidence", "unknown-product"]
+    mock_overrides:
+      search_products:
+        confidence: "LOW"
+        similarity: 0.4
+    conversation:
+      - turn: 1
+        user_message: "Quero comprar hambúrguer de soja vegano"
+        expected:
+          contains_any:
+            - "não encontrei"
+            - "não encontrado"
+            - "cadastrar"
+            - "novo produto"
+            - "⚠️"
+            - "similar"
+          language: "pt-BR"
+        tool_calls_expected:
+          - name: "search_products"
+
+  - id: "C002"
+    name: "Price approval with abnormal price"
+    group: "C"
+    description: "Product has unusually high price that should be flagged"
+    priority: "medium"
+    tags: ["price-warning", "abnormal"]
+    mock_overrides:
+      get_product_prices:
+        prices:
+          - unit_price: 150.00
+            days_old: 5
+            is_fresh: true
+    conversation:
+      - turn: 1
+        user_message: "Quero 5kg de filé mignon"
+        expected:
+          contains_any:
+            - "⚠️"
+            - "preço"
+            - "R$"
+          language: "pt-BR"
+
+  # ============================================
+  # GROUP D - POST-PURCHASE
+  # ============================================
+
+  - id: "D001"
+    name: "Order tracking request"
+    group: "D"
+    description: "User asks about order status"
+    priority: "medium"
+    tags: ["tracking", "status"]
+    conversation:
+      - turn: 1
+        user_message: "Qual o status do meu pedido?"
+        expected:
+          contains_any:
+            - "pedido"
+            - "status"
+            - "entrega"
+            - "acompanhar"
+          language: "pt-BR"
+
+  - id: "D002"
+    name: "Order history request"
+    group: "D"
+    description: "User wants to see past orders"
+    priority: "medium"
+    tags: ["history", "reports"]
+    conversation:
+      - turn: 1
+        user_message: "Mostre meu histórico de compras"
+        expected:
+          contains_any:
+            - "histórico"
+            - "compras"
+            - "pedidos"
+            - "anteriores"
+          language: "pt-BR"
+
+  # ============================================
+  # GROUP E - MANAGEMENT
+  # ============================================
+
+  - id: "E001"
+    name: "Configure preferences via menu"
+    group: "E"
+    description: "User selects option 4 to configure preferences"
+    priority: "medium"
+    tags: ["preferences", "menu"]
+    conversation:
+      - turn: 1
+        user_message: "4"
+        expected:
+          contains_any:
+            - "preferências"
+            - "configurar"
+            - "fornecedor"
+            - "produto"
+          language: "pt-BR"
+
+  - id: "E002"
+    name: "Register new supplier"
+    group: "E"
+    description: "User wants to register a new supplier"
+    priority: "high"
+    tags: ["supplier", "registration", "multi-turn"]
+    conversation:
+      - turn: 1
+        user_message: "Quero cadastrar um novo fornecedor"
+        expected:
+          contains_any:
+            - "fornecedor"
+            - "cadastrar"
+            - "nome"
+            - "informações"
+          language: "pt-BR"
+      - turn: 2
+        user_message: "Nome: Frigorífico Sul, Telefone: 11999887766"
+        expected:
+          contains_any:
+            - "Frigorífico Sul"
+            - "cadastrado"
+            - "registrado"
+            - "✅"
+          language: "pt-BR"
+
+  # ============================================
+  # GROUP F - ERROR HANDLING
+  # ============================================
+
+  - id: "F001"
+    name: "Product without pricing"
+    group: "F"
+    description: "User requests product with no pricing data"
+    priority: "high"
+    tags: ["error", "no-price"]
+    mock_overrides:
+      get_product_prices:
+        prices: []
+        has_prices: false
+    conversation:
+      - turn: 1
+        user_message: "Preciso de camarão fresco"
+        expected:
+          contains_any:
+            - "sem preço"
+            - "não tem preço"
+            - "contatar fornecedor"
+            - "⚠️"
+            - "cotação"
+          not_contains:
+            - "total"
+          language: "pt-BR"
+        tool_calls_expected:
+          - name: "search_products"
+
+  - id: "F002"
+    name: "Supplier not registered"
+    group: "F"
+    description: "User mentions unregistered supplier"
+    priority: "high"
+    tags: ["error", "unknown-supplier"]
+    mock_overrides:
+      check_supplier:
+        exists: false
+    conversation:
+      - turn: 1
+        user_message: "Atualizar preços do fornecedor NovoBrasil"
+        expected:
+          contains_any:
+            - "não encontrado"
+            - "não cadastrado"
+            - "cadastrar"
+            - "⚠️"
+          language: "pt-BR"
+        tool_calls_expected:
+          - name: "check_supplier"
+
+  - id: "F003"
+    name: "General help question"
+    group: "F"
+    description: "User asks general question about capabilities"
+    priority: "low"
+    tags: ["help", "info"]
+    conversation:
+      - turn: 1
+        user_message: "O que você pode fazer?"
+        expected:
+          contains_any:
+            - "compras"
+            - "preços"
+            - "fornecedor"
+            - "ajudar"
+            - "posso"
+          contains_menu: true
+          language: "pt-BR"

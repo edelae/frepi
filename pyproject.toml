@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "frepi-agent"
+version = "0.1.0"
+description = "Frepi Restaurant Purchasing Assistant - Claude Agent SDK Implementation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Frepi Team" }
+]
+dependencies = [
+    "anthropic>=0.40.0",
+    "python-telegram-bot>=21.0",
+    "supabase>=2.0.0",
+    "openai>=1.0.0",
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.0",
+    "click>=8.1.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-html>=4.0.0",
+    "pyyaml>=6.0.0",
+]
+
+[project.scripts]
+frepi = "frepi_agent.main:cli"
+
+[tool.hatch.build.targets.wheel]
+packages = ["frepi_agent"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

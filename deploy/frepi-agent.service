@@ -1,0 +1,27 @@
+[Unit]
+Description=Frepi Agent - Restaurant Purchasing Assistant
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/frepi-agent
+Environment=PATH=/opt/frepi-agent/venv/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=/opt/frepi-agent/.env
+ExecStart=/opt/frepi-agent/venv/bin/python -m frepi_agent.main telegram
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=frepi-agent
+
+# Security
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/frepi-agent
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,112 @@
+[
+  {
+    "product_id": 1,
+    "product_name": "Picanha Friboi Premium",
+    "supplier_id": 1,
+    "supplier_name": "Frigorífico Central",
+    "unit_price": 43.50,
+    "unit": "kg",
+    "effective_date": "2026-01-10",
+    "days_old": 5,
+    "is_fresh": true
+  },
+  {
+    "product_id": 1,
+    "product_name": "Picanha Friboi Premium",
+    "supplier_id": 5,
+    "supplier_name": "Friboi Direto",
+    "unit_price": 41.90,
+    "unit": "kg",
+    "effective_date": "2026-01-12",
+    "days_old": 3,
+    "is_fresh": true
+  },
+  {
+    "product_id": 2,
+    "product_name": "Picanha Marfrig",
+    "supplier_id": 2,
+    "supplier_name": "Marfrig Distribuidora",
+    "unit_price": 47.90,
+    "unit": "kg",
+    "effective_date": "2026-01-08",
+    "days_old": 7,
+    "is_fresh": true
+  },
+  {
+    "product_id": 3,
+    "product_name": "Arroz Camil Tipo 1 5kg",
+    "supplier_id": 3,
+    "supplier_name": "Distribuidor Grãos SP",
+    "unit_price": 28.50,
+    "unit": "pacote",
+    "effective_date": "2026-01-05",
+    "days_old": 10,
+    "is_fresh": true
+  },
+  {
+    "product_id": 3,
+    "product_name": "Arroz Camil Tipo 1 5kg",
+    "supplier_id": 4,
+    "supplier_name": "Atacadão Alimentos",
+    "unit_price": 29.90,
+    "unit": "pacote",
+    "effective_date": "2026-01-03",
+    "days_old": 12,
+    "is_fresh": true
+  },
+  {
+    "product_id": 4,
+    "product_name": "Arroz Tio João Tipo 1 5kg",
+    "supplier_id": 3,
+    "supplier_name": "Distribuidor Grãos SP",
+    "unit_price": 32.00,
+    "unit": "pacote",
+    "effective_date": "2026-01-06",
+    "days_old": 9,
+    "is_fresh": true
+  },
+  {
+    "product_id": 5,
+    "product_name": "Óleo de Soja Soya 900ml",
+    "supplier_id": 4,
+    "supplier_name": "Atacadão Alimentos",
+    "unit_price": 8.90,
+    "unit": "unidade",
+    "effective_date": "2026-01-10",
+    "days_old": 5,
+    "is_fresh": true
+  },
+  {
+    "product_id": 6,
+    "product_name": "Feijão Carioca Camil 1kg",
+    "supplier_id": 3,
+    "supplier_name": "Distribuidor Grãos SP",
+    "unit_price": 9.50,
+    "unit": "pacote",
+    "effective_date": "2026-01-07",
+    "days_old": 8,
+    "is_fresh": true
+  },
+  {
+    "product_id": 7,
+    "product_name": "Filé Mignon Friboi",
+    "supplier_id": 5,
+    "supplier_name": "Friboi Direto",
+    "unit_price": 89.90,
+    "unit": "kg",
+    "effective_date": "2026-01-11",
+    "days_old": 4,
+    "is_fresh": true
+  },
+  {
+    "product_id": 8,
+    "product_name": "Frango Inteiro Sadia",
+    "supplier_id": 4,
+    "supplier_name": "Atacadão Alimentos",
+    "unit_price": 12.90,
+    "unit": "kg",
+    "effective_date": "2026-01-09",
+    "days_old": 6,
+    "is_fresh": true
+  }
+]
