@@ -86,6 +86,67 @@ test_cases:
             args_contain:
               supplier_name: "Marfrig"
 
+  - id: "A003"
+    name: "Onboarding with engagement gauge - Top 5"
+    group: "A"
+    description: "User goes through onboarding, chooses Top 5 at engagement gauge"
+    priority: "high"
+    tags: ["onboarding", "engagement", "preferences"]
+    conversation:
+      - turn: 1
+        user_message: "Oi, quero me cadastrar"
+        expected:
+          contains_any:
+            - "bem-vindo"
+            - "cadastro"
+            - "restaurante"
+          language: "pt-BR"
+      - turn: 2
+        user_message: "1"
+        expected:
+          contains_any:
+            - "Top 5"
+            - "principais"
+            - "preferências"
+            - "produtos"
+          language: "pt-BR"
+        tool_calls_expected:
+          - name: "save_engagement_choice"
+            args_contain:
+              choice: "1"
+
+  - id: "A004"
+    name: "Onboarding with engagement gauge - Skip"
+    group: "A"
+    description: "User goes through onboarding, chooses Skip at engagement gauge"
+    priority: "medium"
+    tags: ["onboarding", "engagement", "skip"]
+    conversation:
+      - turn: 1
+        user_message: "Oi, quero me cadastrar"
+        expected:
+          contains_any:
+            - "bem-vindo"
+            - "cadastro"
+            - "restaurante"
+          language: "pt-BR"
+      - turn: 2
+        user_message: "3"
+        expected:
+          contains_any:
+            - "pular"
+            - "depois"
+            - "completo"
+            - "pronto"
+          not_contains:
+            - "preferência de marca"
+            - "qual marca"
+          language: "pt-BR"
+        tool_calls_expected:
+          - name: "save_engagement_choice"
+            args_contain:
+              choice: "3"
+
   # ============================================
   # GROUP B - PRE-PURCHASE
   # ============================================
@@ -279,6 +340,67 @@ test_cases:
             - "registrado"
             - "✅"
           language: "pt-BR"
+
+  - id: "E003"
+    name: "Preference correction with reason"
+    group: "E"
+    description: "User corrects a recommendation and provides a reason"
+    priority: "high"
+    tags: ["preferences", "correction", "learning"]
+    conversation:
+      - turn: 1
+        user_message: "Não quero Marfrig, prefiro Friboi"
+        expected:
+          contains_any:
+            - "Friboi"
+            - "preferência"
+            - "atualizado"
+            - "entendi"
+          language: "pt-BR"
+      - turn: 2
+        user_message: "A qualidade da Friboi é mais consistente"
+        expected:
+          contains_any:
+            - "anotado"
+            - "registrado"
+            - "salvo"
+            - "obrigado"
+            - "entendi"
+          language: "pt-BR"
+        tool_calls_expected:
+          - name: "save_preference_correction"
+            args_contain:
+              reason: "qualidade"
+
+  - id: "E004"
+    name: "Drip question response"
+    group: "E"
+    description: "User answers a drip preference question during a normal session"
+    priority: "medium"
+    tags: ["preferences", "drip", "learning"]
+    conversation:
+      - turn: 1
+        user_message: "Quero comprar arroz"
+        expected:
+          contains_any:
+            - "arroz"
+            - "marca"
+            - "preferência"
+          language: "pt-BR"
+      - turn: 2
+        user_message: "Prefiro Tio João, máximo R$6 por kg"
+        expected:
+          contains_any:
+            - "Tio João"
+            - "preferência"
+            - "salvo"
+            - "anotado"
+            - "registrado"
+          language: "pt-BR"
+        tool_calls_expected:
+          - name: "answer_drip_question"
+            args_contain:
+              value: "Tio João"
 
   # ============================================
   # GROUP F - ERROR HANDLING

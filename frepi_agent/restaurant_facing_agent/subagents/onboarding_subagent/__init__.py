@@ -1,5 +1,5 @@
-"""Onboarding Subagent - Handles new user registration and preference collection."""
+"""Onboarding Subagent - GPT-4 driven user registration and preference collection."""
 
-from .agent import OnboardingSubagent
+from .agent import OnboardingAgent, OnboardingContext, onboarding_chat, get_onboarding_agent
 
-__all__ = ["OnboardingSubagent"]
+__all__ = ["OnboardingAgent", "OnboardingContext", "onboarding_chat", "get_onboarding_agent"]

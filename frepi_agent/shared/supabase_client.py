@@ -31,6 +31,7 @@ def reset_client():
 
 # Table names as constants
 class Tables:
+    # Production tables
     MASTER_LIST = "master_list"
     SUPPLIER_MAPPED_PRODUCTS = "supplier_mapped_products"
     PRICING_HISTORY = "pricing_history"
@@ -41,6 +42,20 @@ class Tables:
     PURCHASE_ORDERS = "purchase_orders"
     LINE_SESSIONS = "line_sessions"
     USER_PREFERENCES = "user_preferences"
+
+    # Onboarding staging tables
+    ONBOARDING_SESSIONS = "onboarding_sessions"
+    ONBOARDING_STAGING_SUPPLIERS = "onboarding_staging_suppliers"
+    ONBOARDING_STAGING_PRODUCTS = "onboarding_staging_products"
+    ONBOARDING_STAGING_PRICES = "onboarding_staging_prices"
+    ONBOARDING_STAGING_PREFERENCES = "onboarding_staging_preferences"
+    ONBOARDING_INVOICE_PHOTOS = "onboarding_invoice_photos"
+    ONBOARDING_ANALYSIS_INSIGHTS = "onboarding_analysis_insights"
+
+    # Preference & engagement tables (shared across agents)
+    PREFERENCE_COLLECTION_QUEUE = "preference_collection_queue"
+    ENGAGEMENT_PROFILE = "engagement_profile"
+    PREFERENCE_CORRECTIONS = "preference_corrections"
 
 
 async def fetch_one(table: str, filters: dict[str, Any]) -> Optional[dict]:

@@ -218,6 +218,83 @@ Vou precisar de:
 2️⃣ Atualizar preços de fornecedor
 3️⃣ Registrar/Atualizar fornecedor
 4️⃣ Configurar preferências""",
+            "A003_turn1": """Olá! 👋 Bem-vindo ao Frepi!
+
+Vamos começar o cadastro do seu restaurante.
+
+Qual é o nome do seu restaurante?
+
+1️⃣ Fazer uma compra
+2️⃣ Atualizar preços de fornecedor
+3️⃣ Registrar/Atualizar fornecedor
+4️⃣ Configurar preferências""",
+            "A003_turn2": """Ótimo! Você escolheu configurar os Top 5 produtos principais. 🎯
+
+Vou te fazer algumas perguntas sobre preferências para seus 5 produtos mais importantes.
+
+Vamos começar pela **Picanha**:
+Qual marca você prefere?
+
+1️⃣ Fazer uma compra
+2️⃣ Atualizar preços de fornecedor
+3️⃣ Registrar/Atualizar fornecedor
+4️⃣ Configurar preferências""",
+            "A004_turn1": """Olá! 👋 Bem-vindo ao Frepi!
+
+Vamos começar o cadastro do seu restaurante.
+
+Qual é o nome do seu restaurante?
+
+1️⃣ Fazer uma compra
+2️⃣ Atualizar preços de fornecedor
+3️⃣ Registrar/Atualizar fornecedor
+4️⃣ Configurar preferências""",
+            "A004_turn2": """Sem problema! Você pode configurar depois quando quiser. 😊
+
+Cadastro completo! Agora você já pode usar o Frepi para suas compras.
+
+Como posso ajudar?
+
+1️⃣ Fazer uma compra
+2️⃣ Atualizar preços de fornecedor
+3️⃣ Registrar/Atualizar fornecedor
+4️⃣ Configurar preferências""",
+            "E003_turn1": """Entendi! Você prefere **Friboi** em vez de Marfrig. 📝
+
+Posso perguntar por quê? Isso me ajuda a fazer recomendações melhores no futuro.
+
+1️⃣ Fazer uma compra
+2️⃣ Atualizar preços de fornecedor
+3️⃣ Registrar/Atualizar fornecedor
+4️⃣ Configurar preferências""",
+            "E003_turn2": """Anotado! ✅ Preferência atualizada:
+• **Picanha**: Friboi (motivo: qualidade mais consistente)
+
+Obrigado pelo feedback! Vou considerar isso nas próximas recomendações.
+
+1️⃣ Fazer uma compra
+2️⃣ Atualizar preços de fornecedor
+3️⃣ Registrar/Atualizar fornecedor
+4️⃣ Configurar preferências""",
+            "E004_turn1": """Encontrei opções de arroz! 🍚
+
+Antes de continuar, uma pergunta rápida:
+Você tem alguma preferência de marca para arroz?
+
+1️⃣ Fazer uma compra
+2️⃣ Atualizar preços de fornecedor
+3️⃣ Registrar/Atualizar fornecedor
+4️⃣ Configurar preferências""",
+            "E004_turn2": """Preferência salva! ✅
+
+• **Arroz**: Tio João, máximo R$ 6,00/kg
+
+Agora vou buscar as melhores opções com essa preferência.
+
+1️⃣ Fazer uma compra
+2️⃣ Atualizar preços de fornecedor
+3️⃣ Registrar/Atualizar fornecedor
+4️⃣ Configurar preferências""",
             "F003": """Posso ajudar você com:
 
 🛒 **Compras** - Encontrar produtos, comparar preços, fazer pedidos
@@ -232,10 +309,9 @@ Vou precisar de:
         }
 
         # Handle multi-turn tests
-        if test_id == "B002":
-            return responses.get(f"B002_turn{turn}", default_menu)
-        elif test_id == "E002":
-            return responses.get(f"E002_turn{turn}", default_menu)
+        multi_turn_tests = ["B002", "E002", "A003", "A004", "E003", "E004"]
+        if test_id in multi_turn_tests:
+            return responses.get(f"{test_id}_turn{turn}", default_menu)
 
         return responses.get(test_id, default_menu)
 
@@ -390,6 +466,22 @@ class TestGroupC:
     )
     async def test_core_purchasing(self, test_case: TestCase, tool_tracker):
         """Run core purchasing test cases."""
+        runner = TestAgentFromMatrix()
+        await runner.test_from_matrix(test_case, tool_tracker)
+
+
+class TestGroupE:
+    """Group E: Management tests."""
+
+    @pytest.mark.group_e
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "test_case",
+        [tc for tc in TEST_MATRIX.test_cases if tc.group == "E"],
+        ids=[tc.id for tc in TEST_MATRIX.test_cases if tc.group == "E"]
+    )
+    async def test_management(self, test_case: TestCase, tool_tracker):
+        """Run management test cases."""
         runner = TestAgentFromMatrix()
         await runner.test_from_matrix(test_case, tool_tracker)
 

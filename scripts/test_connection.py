@@ -13,8 +13,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from frepi_agent.config import get_config
-from frepi_agent.tools.supabase_client import test_connection, get_supabase_client, Tables
-from frepi_agent.tools.embeddings import generate_embedding
+from frepi_agent.shared.supabase_client import test_connection, get_supabase_client, Tables
+from frepi_agent.restaurant_facing_agent.tools.embeddings import generate_embedding
 
 
 def print_status(name: str, success: bool, details: str = ""):
@@ -67,7 +67,7 @@ async def main():
     # 4. Test vector search (if RPC exists)
     print("\n4. Testing vector search...")
     try:
-        from frepi_agent.tools.product_search import search_products
+        from frepi_agent.restaurant_facing_agent.tools.product_search import search_products
         result = await search_products("picanha")
         print_status("Vector Search", True, f"Found {len(result.matches)} matches")
         if result.best_match:

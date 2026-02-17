@@ -33,6 +33,10 @@ from frepi_agent.supplier_facing_agent.agent import (
     supplier_chat,
     SupplierConversationContext,
 )
+from frepi_agent.restaurant_facing_agent.subagents.onboarding_subagent.agent import (
+    OnboardingContext,
+    onboarding_chat,
+)
 
 # Set up logging
 logging.basicConfig(
@@ -51,6 +55,8 @@ class UserSession:
     supplier_id: int = None
     name: str = None
     awaiting_role_selection: bool = False
+    needs_onboarding: bool = False  # True if onboarding not yet completed
+    onboarding_context: OnboardingContext = field(default_factory=OnboardingContext)  # GPT-4 subagent context
     restaurant_context: RestaurantContext = field(default_factory=RestaurantContext)
     supplier_context: SupplierConversationContext = field(default_factory=SupplierConversationContext)
 
@@ -95,6 +101,12 @@ async def identify_and_setup_session(chat_id: int, session: UserSession) -> User
     if identification.user_type == UserType.RESTAURANT:
         session.restaurant_context.restaurant_id = identification.restaurant_id
         session.restaurant_context.restaurant_name = identification.name
+        # Check onboarding status from database
+        session.needs_onboarding = not identification.onboarding_complete
+        if session.needs_onboarding:
+            # Set up onboarding context for GPT-4 subagent
+            session.onboarding_context.telegram_chat_id = chat_id
+            session.onboarding_context.restaurant_id = identification.restaurant_id
     elif identification.user_type == UserType.SUPPLIER:
         session.supplier_context.supplier_id = identification.supplier_id
         session.supplier_context.supplier_name = identification.name
@@ -235,18 +247,11 @@ async def handle_role_selection(
     if message_lower in ("1", "restaurante", "restaurant"):
         session.user_type = UserType.RESTAURANT
         session.awaiting_role_selection = False
-        return """
-✅ Perfeito! Você está cadastrado como **Restaurante**.
-
-Agora vou te ajudar com suas compras!
-
-1️⃣ **Fazer compras** - encontrar produtos e melhores preços
-2️⃣ **Atualizar preços** - registrar cotações de fornecedores
-3️⃣ **Gerenciar fornecedores** - cadastrar e atualizar
-4️⃣ **Configurar preferências** - personalizar suas compras
-
-O que você precisa hoje? 🛒
-        """.strip()
+        session.needs_onboarding = True
+        # Set up onboarding context for GPT-4 subagent
+        session.onboarding_context.telegram_chat_id = update.effective_chat.id
+        # Let the subagent handle the welcome message
+        return await onboarding_chat("Olá, quero me cadastrar", session.onboarding_context)
 
     elif message_lower in ("2", "fornecedor", "supplier"):
         session.user_type = UserType.SUPPLIER
@@ -280,14 +285,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_message = update.message.text
 
-    logger.info(f"Message from {chat_id}: {user_message[:50]}...")
+    logger.info(f"")
+    logger.info(f"{'='*60}")
+    logger.info(f"📨 INCOMING MESSAGE from chat_id={chat_id}")
+    logger.info(f"   Text: {user_message}")
+    logger.info(f"{'='*60}")
 
     # Get or create session
     session = get_session(chat_id)
+    logger.info(f"   Session: user_type={session.user_type}, needs_onboarding={session.needs_onboarding}, awaiting_role={session.awaiting_role_selection}")
 
     # If this is the first message, identify the user
     if session.user_type == UserType.UNKNOWN and not session.awaiting_role_selection:
+        logger.info(f"   🔍 Identifying user...")
         await identify_and_setup_session(chat_id, session)
+        logger.info(f"   ✅ Identified: user_type={session.user_type}, needs_onboarding={session.needs_onboarding}")
 
         # If still unknown after identification, prompt for role
         if session.user_type == UserType.UNKNOWN:
@@ -300,14 +312,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Handle based on user type
         if session.awaiting_role_selection:
             # User needs to select their role
+            logger.info(f"   🚦 ROUTING → Role Selection")
             response = await handle_role_selection(update, session, user_message)
 
         elif session.user_type == UserType.RESTAURANT:
-            # Route to restaurant agent
-            if update.effective_user:
-                session.restaurant_context.person_name = update.effective_user.first_name
+            # Check if onboarding is needed
+            if session.needs_onboarding:
+                # Route to GPT-4 onboarding subagent
+                logger.info(f"   🚦 ROUTING → Onboarding Subagent (GPT-4)")
+                response = await onboarding_chat(user_message, session.onboarding_context)
+                # Check if onboarding completed
+                if session.onboarding_context.onboarding_complete:
+                    session.needs_onboarding = False
+                    # Transfer info to restaurant context
+                    session.restaurant_context.restaurant_name = session.onboarding_context.restaurant_name
+                    logger.info(f"   ✅ Onboarding completed!")
+            else:
+                # Route to main restaurant agent
+                logger.info(f"   🚦 ROUTING → Main Restaurant Agent")
+                if update.effective_user:
+                    session.restaurant_context.person_name = update.effective_user.first_name
 
-            response = await restaurant_chat(user_message, session.restaurant_context)
+                response = await restaurant_chat(user_message, session.restaurant_context)
 
         elif session.user_type == UserType.SUPPLIER:
             # Route to supplier agent
@@ -332,6 +358,47 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❌ Desculpe, ocorreu um erro ao processar sua mensagem. "
             "Por favor, tente novamente.",
+            parse_mode="Markdown",
+        )
+
+
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle incoming photo messages (for invoice uploads)."""
+    chat_id = update.effective_chat.id
+    session = get_session(chat_id)
+
+    # Only process photos during onboarding (the subagent handles when photos are relevant)
+    if not session.needs_onboarding:
+        await update.message.reply_text(
+            "📷 Recebi sua foto! No momento só processo fotos durante o cadastro inicial. "
+            "Use /start para recomeçar se precisar enviar notas fiscais.",
+            parse_mode="Markdown",
+        )
+        return
+
+    try:
+        # Get the largest photo (best quality)
+        photo = update.message.photo[-1]
+        file_id = photo.file_id
+
+        # Get the file URL from Telegram
+        file = await context.bot.get_file(file_id)
+        file_url = file.file_path
+
+        # Store the photo URL in the onboarding context
+        session.onboarding_context.uploaded_photos.append(file_url)
+
+        photo_count = len(session.onboarding_context.uploaded_photos)
+        await update.message.reply_text(
+            f"📸 Foto {photo_count} recebida!\n\n"
+            f"Envie mais fotos ou digite **\"pronto\"** quando terminar.",
+            parse_mode="Markdown",
+        )
+
+    except Exception as e:
+        logger.error(f"Error handling photo: {e}", exc_info=True)
+        await update.message.reply_text(
+            "❌ Erro ao processar a foto. Por favor, tente novamente.",
             parse_mode="Markdown",
         )
 
@@ -361,6 +428,11 @@ def create_application() -> Application:
     # Message handler for text messages
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
+    )
+
+    # Photo handler for invoice uploads
+    application.add_handler(
+        MessageHandler(filters.PHOTO, handle_photo)
     )
 
     # Error handler

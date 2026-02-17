@@ -12,6 +12,7 @@ from openai import OpenAI
 
 from frepi_agent.config import get_config
 from .prompts.customer_agent import CUSTOMER_AGENT_PROMPT
+from frepi_agent.shared.preference_drip import get_drip_service
 from .tools.product_search import search_products, SearchResult
 from .tools.pricing import (
     get_prices_for_product,
@@ -117,6 +118,76 @@ TOOLS = [
                     }
                 },
                 "required": ["product_id"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_preference_correction",
+            "description": "Save when a user corrects a recommendation or suggestion. Always ask WHY before calling this tool.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_name": {
+                        "type": "string",
+                        "description": "The product name (optional for global corrections)"
+                    },
+                    "preference_type": {
+                        "type": "string",
+                        "enum": ["brand", "price_max", "quality", "supplier", "specification"],
+                        "description": "Type of preference being corrected"
+                    },
+                    "original_value": {
+                        "type": "string",
+                        "description": "What the system suggested"
+                    },
+                    "corrected_value": {
+                        "type": "string",
+                        "description": "What the user wants instead"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why the user prefers this (key learning data)"
+                    },
+                    "context": {
+                        "type": "string",
+                        "enum": ["onboarding", "drip", "purchase", "manual"],
+                        "description": "Where this correction happened"
+                    }
+                },
+                "required": ["preference_type", "corrected_value", "context"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "answer_drip_question",
+            "description": "Save the user's response to a drip preference question appended to a previous response.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_name": {
+                        "type": "string",
+                        "description": "The product being asked about"
+                    },
+                    "preference_type": {
+                        "type": "string",
+                        "enum": ["brand", "price_max", "quality", "supplier"],
+                        "description": "Type of preference"
+                    },
+                    "value": {
+                        "type": "string",
+                        "description": "The user's answer"
+                    },
+                    "skip": {
+                        "type": "boolean",
+                        "description": "True if user wants to skip",
+                        "default": False
+                    }
+                },
+                "required": ["product_name", "preference_type"]
             }
         }
     },
@@ -230,6 +301,20 @@ class FrepiAgent:
 
         # Get final response
         assistant_message = response.choices[0].message.content or ""
+
+        # Append drip questions if applicable
+        if context.restaurant_id:
+            try:
+                drip_service = get_drip_service()
+                drip_questions = await drip_service.get_drip_questions(
+                    context.restaurant_id
+                )
+                drip_text = drip_service.format_drip_questions(drip_questions)
+                if drip_text:
+                    assistant_message += drip_text
+            except Exception:
+                pass  # Don't let drip errors break normal flow
+
         context.add_message("assistant", assistant_message)
 
         return assistant_message
@@ -287,11 +372,180 @@ class FrepiAgent:
                     "count": len(suppliers),
                 }
 
+            elif tool_name == "save_preference_correction":
+                return await self._save_preference_correction(
+                    context,
+                    args.get("product_name"),
+                    args["preference_type"],
+                    args.get("original_value"),
+                    args["corrected_value"],
+                    args.get("reason"),
+                    args["context"],
+                )
+
+            elif tool_name == "answer_drip_question":
+                return await self._answer_drip_question(
+                    context,
+                    args["product_name"],
+                    args["preference_type"],
+                    args.get("value"),
+                    args.get("skip", False),
+                )
+
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
 
         except Exception as e:
             return {"error": str(e)}
+
+
+    async def _save_preference_correction(
+        self,
+        context: ConversationContext,
+        product_name: Optional[str],
+        preference_type: str,
+        original_value: Optional[str],
+        corrected_value: str,
+        reason: Optional[str],
+        correction_context: str,
+    ) -> dict:
+        """Save a preference correction with reasoning."""
+        if not context.restaurant_id:
+            return {"error": "No restaurant linked"}
+
+        from frepi_agent.shared.supabase_client import get_supabase_client, Tables
+        import json
+
+        client = get_supabase_client()
+
+        # Find master_list_id if product given
+        master_list_id = None
+        if product_name:
+            result = client.table(Tables.MASTER_LIST).select("id").eq(
+                "restaurant_id", context.restaurant_id
+            ).ilike("product_name", f"%{product_name}%").limit(1).execute()
+            if result.data:
+                master_list_id = result.data[0]["id"]
+
+        # Insert correction record
+        correction_data = {
+            "restaurant_id": context.restaurant_id,
+            "master_list_id": master_list_id,
+            "preference_type": preference_type,
+            "original_value": json.dumps(original_value) if original_value else None,
+            "corrected_value": json.dumps(corrected_value),
+            "correction_reason": reason,
+            "correction_context": correction_context,
+        }
+
+        client.table(Tables.PREFERENCE_CORRECTIONS).insert(correction_data).execute()
+
+        # Update the actual preference if product found
+        if master_list_id:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc).isoformat()
+            pref_data = {}
+
+            if preference_type == "brand":
+                pref_data["brand_preferences"] = {"brand": corrected_value}
+                pref_data["brand_preferences_source"] = "user_correction"
+                pref_data["brand_preferences_added_at"] = now
+            elif preference_type == "price_max":
+                pref_data["price_preference"] = corrected_value
+                pref_data["price_preference_source"] = "user_correction"
+                pref_data["price_preference_added_at"] = now
+            elif preference_type == "quality":
+                pref_data["quality_preference"] = {"quality": corrected_value}
+                pref_data["quality_preference_source"] = "user_correction"
+                pref_data["quality_preference_added_at"] = now
+
+            if pref_data:
+                existing = client.table(
+                    Tables.RESTAURANT_PRODUCT_PREFERENCES
+                ).select("id").eq(
+                    "restaurant_id", context.restaurant_id
+                ).eq("master_list_id", master_list_id).limit(1).execute()
+
+                if existing.data:
+                    client.table(
+                        Tables.RESTAURANT_PRODUCT_PREFERENCES
+                    ).update(pref_data).eq("id", existing.data[0]["id"]).execute()
+                else:
+                    pref_data["restaurant_id"] = context.restaurant_id
+                    pref_data["master_list_id"] = master_list_id
+                    pref_data["is_active"] = True
+                    client.table(
+                        Tables.RESTAURANT_PRODUCT_PREFERENCES
+                    ).insert(pref_data).execute()
+
+        # Update engagement profile
+        profile = client.table(Tables.ENGAGEMENT_PROFILE).select(
+            "total_corrections, corrections_with_reason"
+        ).eq("restaurant_id", context.restaurant_id).limit(1).execute()
+
+        if profile.data:
+            p = profile.data[0]
+            updates = {"total_corrections": p["total_corrections"] + 1}
+            if reason:
+                updates["corrections_with_reason"] = p["corrections_with_reason"] + 1
+            client.table(Tables.ENGAGEMENT_PROFILE).update(
+                updates
+            ).eq("restaurant_id", context.restaurant_id).execute()
+
+        return {
+            "success": True,
+            "product": product_name,
+            "type": preference_type,
+            "corrected_to": corrected_value,
+            "has_reason": bool(reason),
+            "message": f"Anotado! Preferência de {preference_type} atualizada para {corrected_value}."
+        }
+
+    async def _answer_drip_question(
+        self,
+        context: ConversationContext,
+        product_name: str,
+        preference_type: str,
+        value: Optional[str],
+        skip: bool,
+    ) -> dict:
+        """Handle a drip question response."""
+        if not context.restaurant_id:
+            return {"error": "No restaurant linked"}
+
+        drip_service = get_drip_service()
+
+        # Find master_list_id
+        from frepi_agent.shared.supabase_client import get_supabase_client, Tables
+        client = get_supabase_client()
+
+        result = client.table(Tables.MASTER_LIST).select("id").eq(
+            "restaurant_id", context.restaurant_id
+        ).ilike("product_name", f"%{product_name}%").limit(1).execute()
+
+        if not result.data:
+            return {"error": f"Product '{product_name}' not found"}
+
+        master_list_id = result.data[0]["id"]
+
+        await drip_service.record_drip_response(
+            restaurant_id=context.restaurant_id,
+            master_list_id=master_list_id,
+            preference_type=preference_type,
+            value=value,
+            skipped=skip,
+        )
+
+        if skip:
+            return {"success": True, "skipped": True, "product": product_name}
+
+        return {
+            "success": True,
+            "product": product_name,
+            "type": preference_type,
+            "value": value,
+            "message": f"Preferência de {preference_type} salva para {product_name}."
+        }
 
 
 # Global agent instance
