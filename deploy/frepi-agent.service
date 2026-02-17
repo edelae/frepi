@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/frepi-agent
+WorkingDirectory=/opt/frepi-agent/repo
 Environment=PATH=/opt/frepi-agent/venv/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=/opt/frepi-agent/.env
 ExecStart=/opt/frepi-agent/venv/bin/python -m frepi_agent.main telegram
