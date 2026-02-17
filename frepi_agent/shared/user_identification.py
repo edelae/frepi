@@ -5,11 +5,16 @@ Determines whether an incoming message is from a restaurant user,
 supplier, or unknown user that needs onboarding.
 """
 
+import logging
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
+from postgrest.exceptions import APIError
+
 from .supabase_client import get_supabase_client, Tables
+
+logger = logging.getLogger(__name__)
 
 
 class UserType(str, Enum):
@@ -28,6 +33,7 @@ class UserIdentification:
     supplier_id: Optional[int] = None
     name: Optional[str] = None
     is_new_user: bool = False
+    onboarding_complete: bool = False  # True if onboarding_completed_at is set in DB
 
 
 async def identify_user(telegram_chat_id: int) -> UserIdentification:
@@ -50,12 +56,17 @@ async def identify_user(telegram_chat_id: int) -> UserIdentification:
     # Look in restaurant_people table for matching whatsapp_number or telegram_chat_id
     restaurant_user = await _find_restaurant_user(client, chat_id_str)
     if restaurant_user:
+        # Check if onboarding is complete (from joined restaurants table)
+        restaurants_data = restaurant_user.get("restaurants", {})
+        onboarding_completed_at = restaurants_data.get("onboarding_completed_at") if restaurants_data else None
+
         return UserIdentification(
             user_type=UserType.RESTAURANT,
             user_id=restaurant_user["id"],
             restaurant_id=restaurant_user.get("restaurant_id"),
             name=restaurant_user.get("first_name") or restaurant_user.get("full_name"),
             is_new_user=False,
+            onboarding_complete=onboarding_completed_at is not None,
         )
 
     # Check if this is a supplier
@@ -78,12 +89,33 @@ async def identify_user(telegram_chat_id: int) -> UserIdentification:
 
 
 async def _find_restaurant_user(client, chat_id_str: str) -> Optional[dict]:
-    """Find a restaurant user by Telegram chat ID or WhatsApp number."""
-    # Try to find by whatsapp_number (stored with chat ID)
+    """Find a restaurant user by Telegram chat ID and check onboarding status."""
+    # Try to find by whatsapp_number (which stores the telegram chat ID)
+    # Try with JOIN first, fall back to simple query if column doesn't exist
+    try:
+        result = (
+            client.table(Tables.RESTAURANT_PEOPLE)
+            .select("id, restaurant_id, first_name, last_name, full_name, whatsapp_number, restaurants(onboarding_completed_at)")
+            .eq("whatsapp_number", chat_id_str)
+            .eq("is_active", True)
+            .limit(1)
+            .execute()
+        )
+        if result.data:
+            logger.info(f"Found restaurant user with JOIN: {result.data[0]}")
+            return result.data[0]
+    except APIError as e:
+        # Column might not exist yet - fall back to simple query
+        logger.warning(f"JOIN query failed (column may not exist): {e}")
+    except Exception as e:
+        # Catch any other unexpected errors
+        logger.warning(f"Unexpected error in JOIN query: {type(e).__name__}: {e}")
+
+    # Simple query without JOIN (for when onboarding_completed_at column doesn't exist)
     result = (
         client.table(Tables.RESTAURANT_PEOPLE)
         .select("id, restaurant_id, first_name, last_name, full_name, whatsapp_number")
-        .or_(f"whatsapp_number.eq.{chat_id_str},telegram_chat_id.eq.{chat_id_str}")
+        .eq("whatsapp_number", chat_id_str)
         .eq("is_active", True)
         .limit(1)
         .execute()
@@ -109,12 +141,12 @@ async def _find_restaurant_user(client, chat_id_str: str) -> Optional[dict]:
 
 
 async def _find_supplier(client, chat_id_str: str) -> Optional[dict]:
-    """Find a supplier by Telegram chat ID or WhatsApp number."""
-    # Try to find by whatsapp_number (stored with chat ID)
+    """Find a supplier by Telegram chat ID (stored in whatsapp_number field)."""
+    # Try to find by whatsapp_number (which stores the telegram chat ID)
     result = (
         client.table(Tables.SUPPLIERS)
         .select("id, company_name, primary_contact_name, whatsapp_number")
-        .or_(f"whatsapp_number.eq.{chat_id_str},telegram_chat_id.eq.{chat_id_str}")
+        .eq("whatsapp_number", chat_id_str)
         .eq("is_active", True)
         .limit(1)
         .execute()
