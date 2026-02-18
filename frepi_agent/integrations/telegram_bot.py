@@ -446,6 +446,15 @@ def run_polling():
     logger.info("Starting Frepi Telegram bot (polling mode)...")
 
     application = create_application()
+
+    # Start heartbeat scheduler for proactive tasks
+    try:
+        from frepi_agent.services.heartbeat import init_heartbeat
+        init_heartbeat(application.bot)
+        logger.info("🔔 Heartbeat scheduler started")
+    except Exception as e:
+        logger.warning(f"Heartbeat setup failed (continuing without): {e}")
+
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
