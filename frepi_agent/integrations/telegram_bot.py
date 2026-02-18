@@ -408,6 +408,16 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Update {update} caused error {context.error}")
 
 
+async def _post_init(application: Application):
+    """Called after the application is initialized (inside the event loop)."""
+    try:
+        from frepi_agent.services.heartbeat import init_heartbeat
+        init_heartbeat(application.bot)
+        logger.info("🔔 Heartbeat scheduler started")
+    except Exception as e:
+        logger.warning(f"Heartbeat setup failed (continuing without): {e}")
+
+
 def create_application() -> Application:
     """Create and configure the Telegram application."""
     config = get_config()
@@ -415,8 +425,8 @@ def create_application() -> Application:
     if not config.telegram_bot_token:
         raise ValueError("TELEGRAM_BOT_TOKEN not configured")
 
-    # Create application
-    application = Application.builder().token(config.telegram_bot_token).build()
+    # Create application with post_init for heartbeat (needs running event loop)
+    application = Application.builder().token(config.telegram_bot_token).post_init(_post_init).build()
 
     # Add handlers
     application.add_handler(CommandHandler("start", start_command))
@@ -446,15 +456,6 @@ def run_polling():
     logger.info("Starting Frepi Telegram bot (polling mode)...")
 
     application = create_application()
-
-    # Start heartbeat scheduler for proactive tasks
-    try:
-        from frepi_agent.services.heartbeat import init_heartbeat
-        init_heartbeat(application.bot)
-        logger.info("🔔 Heartbeat scheduler started")
-    except Exception as e:
-        logger.warning(f"Heartbeat setup failed (continuing without): {e}")
-
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
